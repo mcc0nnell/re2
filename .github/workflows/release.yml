@@ -10,8 +10,10 @@ jobs:
       # Required to create the release
       # and upload the release assets.
       contents: write
-      # Required for Sigstore signing.
+      # Required for Sigstore and provenance signing.
       id-token: write
+      # Required to store provenance attestations.
+      attestations: write
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,9 +34,19 @@ jobs:
         with:
           # N.B. This is a whitespace-separated string!
           inputs: '*.tar.gz *.zip'
+      - name: Attest BCR source archive
+        id: attest-bcr-source
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: re2-${{ github.ref_name }}.zip
+      - name: Name BCR provenance bundle
+        run: |
+          cp "${{ steps.attest-bcr-source.outputs.bundle-path }}" \
+            "re2-${GITHUB_REF_NAME}.zip.intoto.jsonl"
+        shell: bash
       - run: |
           gh release upload "${GITHUB_REF_NAME}" \
-            *.tar.gz *.zip *.sigstore* \
+            *.tar.gz *.zip *.sigstore* *.intoto.jsonl \
             --repo "${GITHUB_REPOSITORY}"
         shell: bash
   create-bazel:
